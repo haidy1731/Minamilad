@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>العملاء</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: 'Cairo', sans-serif;
+        background-color: #f5f5f5;
+        direction: rtl;
+    }
+    
+    .navbar {
+        background-color: #0b5d3b;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    nav a {
+        color: white;
+        text-decoration: none;
+        font-size: 18px;
+        margin-left: 15px;
+    }
+    
+    .logo {
+        display: flex;
+        align-items: center;
+    }
+    
+    .logo img {
+        height: 60px;
+        margin-left: 10px;
+    }
+    
+    .logo span {
+        color: #f4c542;
+        font-size: 22px;
+        font-weight: bold;
+    }
+    
+
+.container{
+    width:90%;
+    margin:auto;
+    background:white;
+    padding:20px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+h2{
+    text-align:center;
+    color:#0b5d3b;
+}
+
+input{
+    width:100%;
+    padding:8px;
+    margin:5px 0;
+}
+
+button{
+    padding:8px 12px;
+    margin:3px;
+    cursor:pointer;
+    border:none;
+    color:white;
+}
+
+.add{
+    background:#0b5d3b;
+}
+
+.editBtn{
+    background:#f0ad4e;
+}
+
+.deleteBtn{
+    background:red;
+}
+
+table{
+    width:100%;
+    margin-top:20px;
+    border-collapse:collapse;
+}
+
+th,td{
+    border:1px solid #ccc;
+    padding:8px;
+    text-align:center;
+}
+
+/* ===== Popup ===== */
+#editBox{
+    display:none;
+    position:fixed;
+    top:20%;
+    right:30%;
+    background:white;
+    padding:20px;
+    box-shadow:0 0 10px gray;
+    z-index:999;
+}
+
+#editBox input{
+    display:block;
+    margin:8px 0;
+    padding:6px;
+    width:250px;
+}
+</style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div class="logo">
+            <img src="logo.jpeg">
+            <span>مينا ميلاد</span>
+        </div>
+    
+        <nav>
+            <a href="index.html">الرئيسية</a>
+            <a href="inventory.html">المخزن</a>
+            <a href="cart.html">العربة</a>
+            <a href="invoice.html">الفواتير</a>
+            <a href="customers.html">الزباين</a>
+          </nav>
+    </div>
+
+<div class="container">
+
+<h2>إدارة العملاء</h2>
+
+<!-- ===== Add ===== -->
+<input id="name" placeholder="اسم العميل">
+<input id="phone" placeholder="رقم التليفون">
+<input id="address" placeholder="العنوان">
+<input id="agent" placeholder="اسم المتعامل">
+
+<button class="add" onclick="addCustomer()">➕ إضافة عميل</button>
+
+<!-- ===== Table ===== -->
+<table>
+<thead>
+<tr>
+    <th>الاسم</th>
+    <th>التليفون</th>
+    <th>العنوان</th>
+    <th>المتعامل</th>
+    <th>الإجراءات</th>
+</tr>
+</thead>
+
+<tbody id="list"></tbody>
+</table>
+
+</div>
+
+<!-- ===== Edit Popup ===== -->
+<div id="editBox">
+
+<h3>تعديل العميل</h3>
+
+<input id="editName">
+<input id="editPhone">
+<input id="editAddress">
+<input id="editAgent">
+
+<button onclick="saveEdit()" style="background:#0b5d3b;">💾 حفظ</button>
+<button onclick="closeEdit()" style="background:gray;">إغلاق</button>
+
+</div>
+
+<script>
+
+/* ======================
+   البيانات
+====================== */
+
+let customers = JSON.parse(localStorage.getItem("customers")) || [];
+
+let editIndex = null;
+
+/* ======================
+   عرض
+====================== */
+
+function render(){
+
+    let list = document.getElementById("list");
+    list.innerHTML = "";
+
+    customers.forEach((c, index)=>{
+
+        list.innerHTML += `
+        <tr>
+            <td>${c.name}</td>
+            <td>${c.phone}</td>
+            <td>${c.address}</td>
+            <td>${c.agent}</td>
+            <td>
+                <button class="editBtn" onclick="openEdit(${index})">تعديل</button>
+                <button class="deleteBtn" onclick="deleteCustomer(${index})">حذف</button>
+            </td>
+        </tr>
+        `;
+    });
+}
+
+render();
+
+/* ======================
+   إضافة
+====================== */
+
+function addCustomer(){
+
+    let name = document.getElementById("name").value;
+    let phone = document.getElementById("phone").value;
+    let address = document.getElementById("address").value;
+    let agent = document.getElementById("agent").value;
+
+    if(!name || !phone){
+        alert("اكتبي الاسم ورقم التليفون");
+        return;
+    }
+
+    customers.push({ name, phone, address, agent });
+
+    localStorage.setItem("customers", JSON.stringify(customers));
+
+    document.getElementById("name").value = "";
+    document.getElementById("phone").value = "";
+    document.getElementById("address").value = "";
+    document.getElementById("agent").value = "";
+
+    render();
+}
+
+/* ======================
+   حذف
+====================== */
+
+function deleteCustomer(index){
+    customers.splice(index, 1);
+    localStorage.setItem("customers", JSON.stringify(customers));
+    render();
+}
+
+/* ======================
+   تعديل
+====================== */
+
+function openEdit(index){
+
+    editIndex = index;
+
+    let c = customers[index];
+
+    document.getElementById("editName").value = c.name;
+    document.getElementById("editPhone").value = c.phone;
+    document.getElementById("editAddress").value = c.address;
+    document.getElementById("editAgent").value = c.agent;
+
+    document.getElementById("editBox").style.display = "block";
+}
+
+function closeEdit(){
+    document.getElementById("editBox").style.display = "none";
+}
+
+function saveEdit(){
+
+    customers[editIndex] = {
+        name: document.getElementById("editName").value,
+        phone: document.getElementById("editPhone").value,
+        address: document.getElementById("editAddress").value,
+        agent: document.getElementById("editAgent").value
+    };
+
+    localStorage.setItem("customers", JSON.stringify(customers));
+
+    closeEdit();
+    render();
+}
+
+</script>
+
+</body>
+</html>

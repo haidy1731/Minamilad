@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>الفواتير</title>
+
+<style>
+
+body {
+    margin: 0;
+    font-family: 'Cairo', sans-serif;
+    background-color: #f5f5f5;
+    direction: rtl;
+}
+
+.navbar {
+    background-color: #0b5d3b;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    font-size: 18px;
+    margin-left: 15px;
+}
+
+nav a:hover { color: #f4c542; }
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+.logo img {
+    height: 60px;
+    margin-left: 10px;
+}
+
+.logo span {
+    color: #f4c542;
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.container{
+    padding:20px;
+}
+
+.card{
+    background:white;
+    padding:15px;
+    margin-bottom:15px;
+    border-radius:10px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+}
+
+th,td{
+    border:1px solid #ddd;
+    padding:6px;
+    text-align:center;
+}
+
+.total{
+    margin-top:10px;
+    font-weight:bold;
+    text-align:left;
+}
+
+h2{
+    text-align:center;
+}
+
+button{
+    padding:8px 12px;
+    cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+     <!-- Navbar -->
+     <div class="navbar">
+        <div class="logo">
+            <img src="logo.jpeg" alt="logo">
+            <span>مينا ميلاد</span>
+        </div>
+
+        <nav>
+            <a href="index.html">الرئيسية</a>
+            <a href="inventory.html">المخزن</a>
+            <a href="cart.html">العربة</a>
+            <a href="invoice.html">الفواتير</a>
+            <a href="customers.html">الزباين</a>
+          </nav>
+    </div>
+
+<h2>📄 الفواتير اليومية</h2>
+
+<div class="container">
+
+<div style="text-align:center;margin-bottom:10px">
+<button onclick="deleteToday()">🗑 حذف فواتير اليوم</button>
+</div>
+
+<div id="list"></div>
+
+<div style="text-align:center;font-size:20px;margin-top:15px">
+💰 إجمالي اليوم: <span id="dayTotal">0</span>
+</div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+getFirestore,
+collection,
+getDocs,
+deleteDoc,
+doc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAkIp0t7NVAkS6m9v39734r6-XHQUHtVgM",
+  authDomain: "minamiladdistrubute.firebaseapp.com",
+  projectId: "minamiladdistrubute",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const invoiceCol = collection(db,"invoices");
+
+let todayTotal = 0;
+
+// ================= LOAD =================
+async function loadInvoices(){
+
+let snap = await getDocs(invoiceCol);
+
+let list = document.getElementById("list");
+list.innerHTML = "";
+todayTotal = 0;
+
+let today = new Date().toDateString();
+
+snap.forEach(d=>{
+
+    let data = d.data();
+
+    // ⚠️ Firestore timestamp handling
+    let invoiceDate = "";
+
+    if(data.date?.toDate){
+        invoiceDate = data.date.toDate().toDateString();
+    } else {
+        invoiceDate = new Date(data.date).toDateString();
+    }
+
+    if(invoiceDate === today){
+
+        let itemsHTML = "";
+        let invoiceTotal = 0;
+
+        // ✅ مهم جدًا: التعامل مع شكل البيانات الحقيقي
+        (data.items || []).forEach(item=>{
+
+            let lineTotal = item.price * item.qty;
+            invoiceTotal += lineTotal;
+
+            itemsHTML += `
+            <tr>
+                <td>${item.code || ""}</td>
+                <td>${item.name || ""}</td>
+                <td>${item.price || 0}</td>
+                <td>${item.qty || 0}</td>
+                <td>${lineTotal}</td>
+            </tr>
+            `;
+        });
+
+        todayTotal += invoiceTotal;
+
+        list.innerHTML += `
+        <div class="card">
+
+            <div>📅 ${data.date?.toDate ? data.date.toDate().toLocaleString() : data.date}</div>
+
+            <table>
+                <tr>
+                    <th>كود</th>
+                    <th>اسم</th>
+                    <th>سعر</th>
+                    <th>كمية</th>
+                    <th>الإجمالي</th>
+                </tr>
+                ${itemsHTML}
+            </table>
+
+            <div class="total">
+                💰 إجمالي الفاتورة: ${invoiceTotal}
+            </div>
+
+        </div>
+        `;
+    }
+});
+
+document.getElementById("dayTotal").innerText = todayTotal;
+
+}
+
+// ================= DELETE TODAY =================
+async function deleteToday(){
+
+let snap = await getDocs(invoiceCol);
+
+let today = new Date().toDateString();
+
+snap.forEach(async d=>{
+
+    let data = d.data();
+
+    let invoiceDate = "";
+
+    if(data.date?.toDate){
+        invoiceDate = data.date.toDate().toDateString();
+    } else {
+        invoiceDate = new Date(data.date).toDateString();
+    }
+
+    if(invoiceDate === today){
+        await deleteDoc(doc(db,"invoices",d.id));
+    }
+
+});
+
+loadInvoices();
+}
+
+window.deleteToday = deleteToday;
+
+loadInvoices();
+
+</script>
+
+</body>
+</html>

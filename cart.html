@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>العربة والفواتير</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Cairo', sans-serif;
+    background-color: #f5f5f5;
+    direction: rtl;
+}
+
+.navbar {
+    background-color: #0b5d3b;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    font-size: 18px;
+    margin-left: 15px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+.logo img {
+    height: 60px;
+    margin-left: 10px;
+}
+
+.logo span {
+    color: #f4c542;
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.container {
+    padding: 20px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.table th, .table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+}
+
+button {
+    padding: 6px 10px;
+    margin: 3px;
+    cursor: pointer;
+}
+
+.total-box {
+    margin-top: 15px;
+    font-size: 20px;
+    text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <div class="logo">
+        <img src="logo.jpeg">
+        <span>مينا ميلاد</span>
+    </div>
+
+    <nav>
+        <a href="index.html">الرئيسية</a>
+        <a href="inventory.html">المخزن</a>
+        <a href="cart.html">العربة</a>
+        <a href="invoice.html">الفواتير</a>
+        <a href="customers.html">الزباين</a>
+      </nav>
+</div>
+
+<h2 style="text-align:center">العربة والفواتير</h2>
+
+<div class="container">
+
+<table class="table">
+<thead>
+<tr>
+<th>كود</th>
+<th>اسم</th>
+<th>سعر</th>
+<th>كمية</th>
+<th>الإجمالي</th>
+<th>تحكم</th>
+</tr>
+</thead>
+<tbody id="cartTable"></tbody>
+</table>
+
+<div class="total-box">
+إجمالي العربة: <span id="grandTotal">0</span>
+</div>
+
+<div style="text-align:center">
+<button onclick="sellAll()">💰 بيع الكل</button>
+<button onclick="clearCart()">♻️ تفريغ العربة</button>
+</div>
+
+</div>
+
+<h2 style="text-align:center">فاتورة المعاينة</h2>
+
+<table class="table">
+<thead>
+<tr>
+<th>كود</th>
+<th>اسم</th>
+<th>سعر</th>
+<th>كمية</th>
+<th>الإجمالي</th>
+</tr>
+</thead>
+<tbody id="invoicePreview"></tbody>
+</table>
+
+<div class="total-box">
+إجمالي الفاتورة: <span id="invoiceTotal">0</span>
+</div>
+
+<div style="text-align:center">
+<button onclick="openInvoicePage()">🧾 إنشاء فاتورة</button>
+<button onclick="confirmInvoice()">✅ تأكيد الفاتورة</button>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+getFirestore,
+collection,
+getDocs,
+deleteDoc,
+doc,
+updateDoc,
+addDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAkIp0t7NVAkS6m9v39734r6-XHQUHtVgM",
+  authDomain: "minamiladdistrubute.firebaseapp.com",
+  projectId: "minamiladdistrubute",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const cartCol = collection(db,"cart");
+const productsCol = collection(db,"products");
+const invoiceCol = collection(db,"invoices");
+
+let invoiceItems = [];
+
+// ================= LOAD CART =================
+async function loadCart(){
+
+    let snapshot = await getDocs(cartCol);
+    let table = document.getElementById("cartTable");
+    table.innerHTML = "";
+
+    let total = 0;
+
+    snapshot.forEach(docSnap=>{
+        let c = docSnap.data();
+        let id = docSnap.id;
+
+        let rowTotal = c.price * c.qty;
+        total += rowTotal;
+
+        table.innerHTML += `
+<tr>
+<td>${c.code}</td>
+<td>${c.name}</td>
+<td>${c.price}</td>
+<td>${c.qty}</td>
+<td>${rowTotal}</td>
+<td>
+<input type="number" id="sell${id}" placeholder="كمية البيع" min="1" max="${c.qty}">
+<button onclick="sellItem('${id}')">💰 بيع</button>
+<button onclick="removeItem('${id}')">❌ حذف</button>
+</td>
+</tr>`;
+    });
+
+    document.getElementById("grandTotal").innerText = total;
+}
+
+// ================= SELL ITEM =================
+async function sellItem(id){
+
+let snap = await getDocs(cartCol);
+let item = null;
+
+snap.forEach(d=>{
+    if(d.id === id){
+        item = { ...d.data(), id: d.id };
+    }
+});
+
+if(!item) return;
+
+let sellQty = +document.getElementById("sell"+id).value;
+
+if(!sellQty || sellQty <= 0){
+    alert("ادخلي كمية صحيحة");
+    return;
+}
+
+if(sellQty > item.qty){
+    alert("الكمية أكبر من المتاح");
+    return;
+}
+
+invoiceItems.push({
+    code: item.code,
+    name: item.name,
+    price: item.price,
+    qty: sellQty,
+    total: item.price * sellQty
+});
+
+renderInvoicePreview();
+}
+
+// ================= SELL ALL =================
+async function sellAll(){
+
+let snap = await getDocs(cartCol);
+
+invoiceItems = [];
+
+snap.forEach(d=>{
+    let c = d.data();
+
+    invoiceItems.push({
+        code: c.code,
+        name: c.name,
+        price: c.price,
+        qty: c.qty,
+        total: c.price * c.qty
+    });
+});
+
+renderInvoicePreview();
+}
+
+// ================= RENDER INVOICE =================
+function renderInvoicePreview(){
+
+let table = document.getElementById("invoicePreview");
+table.innerHTML = "";
+
+let total = 0;
+
+invoiceItems.forEach((item, index)=>{
+
+    total += item.total;
+
+    table.innerHTML += `
+    <tr>
+    <td>${item.code}</td>
+    <td>${item.name}</td>
+    <td>${item.price}</td>
+
+    <td>
+        <input type="number" value="${item.qty}" min="1"
+            onchange="updateInvoiceQty(${index}, this.value)">
+    </td>
+
+    <td>${item.total}</td>
+
+    <td>
+        <button onclick="removeInvoiceItem(${index})">🗑 حذف</button>
+    </td>
+    </tr>
+    `;
+});
+
+document.getElementById("invoiceTotal").innerText = total;
+}
+function updateInvoiceQty(index, value){
+
+let qty = +value;
+
+if(qty <= 0){
+    alert("الكمية لازم تكون أكبر من 0");
+    return;
+}
+
+invoiceItems[index].qty = qty;
+invoiceItems[index].total = qty * invoiceItems[index].price;
+
+renderInvoicePreview();
+}
+function removeInvoiceItem(index){
+    invoiceItems.splice(index, 1);
+    renderInvoicePreview();
+}
+// ================= CONFIRM =================
+function openInvoicePage(){
+
+if(invoiceItems.length === 0){
+    alert("لا يوجد منتجات في الفاتورة");
+    return;
+}
+
+// نحفظ البيانات مؤقتاً
+localStorage.setItem("invoiceData", JSON.stringify(invoiceItems));
+
+window.open("print.html", "_blank");
+}
+
+window.openInvoicePage = openInvoicePage;
+// ================= CONFIRM =================
+async function confirmInvoice(){
+
+if(invoiceItems.length === 0){
+    alert("لا يوجد منتجات");
+    return;
+}
+
+// حفظ الفاتورة
+await addDoc(invoiceCol,{
+    items: invoiceItems,
+    total: invoiceItems.reduce((a,b)=>a+b.total,0),
+    date: new Date().toLocaleString()
+});
+
+// تحديث العربة صح 👇
+let cartSnap = await getDocs(cartCol);
+
+for(const item of invoiceItems){
+
+    cartSnap.forEach(async d=>{
+        let c = d.data();
+
+        if(c.code === item.code){
+
+            // 🟢 لو كله اتباع
+            if(item.qty === c.qty){
+                await deleteDoc(doc(db,"cart",d.id));
+            }
+            // 🟢 لو جزء فقط
+            else if(item.qty < c.qty){
+                await updateDoc(doc(db,"cart",d.id),{
+                    qty: c.qty - item.qty
+                });
+            }
+
+        }
+    });
+}
+
+invoiceItems = [];
+renderInvoicePreview();
+loadCart();
+
+alert("تم حفظ الفاتورة");
+}
+
+// ================= CLEAR CART =================
+async function clearCart(){
+
+let snapshot = await getDocs(cartCol);
+
+for(const d of snapshot.docs){
+
+    let item = d.data();
+
+    let prodSnap = await getDocs(productsCol);
+
+    for(const p of prodSnap.docs){
+
+        let data = p.data();
+
+        if(data.code === item.code){
+            await updateDoc(doc(db,"products",p.id),{
+                qty: data.qty + item.qty
+            });
+            break;
+        }
+    }
+
+    await deleteDoc(doc(db,"cart",d.id));
+}
+
+loadCart();
+}
+
+// ================= REMOVE =================
+async function removeItem(id){
+    await deleteDoc(doc(db,"cart",id));
+    loadCart();
+}
+
+// ================= INIT =================
+window.onload = loadCart;
+
+window.sellItem = sellItem;
+window.sellAll = sellAll;
+window.confirmInvoice = confirmInvoice;
+window.clearCart = clearCart;
+window.removeItem = removeItem;
+window.updateInvoiceQty = updateInvoiceQty;
+window.removeInvoiceItem = removeInvoiceItem;
+
+</script>
+
+</body>
+</html>

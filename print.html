@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>فاتورة طباعة</title>
+
+<style>
+body{
+    font-family: 'Cairo', sans-serif;
+    direction: rtl;
+    background:#eee;
+}
+
+.invoice-box{
+    width: 210mm;
+    min-height: 297mm;
+    background:white;
+    margin:auto;
+    padding:20px;
+    box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+
+.header{
+    text-align:center;
+    border-bottom:2px solid #0b5d3b;
+    padding-bottom:10px;
+}
+
+.header img{
+    height:80px;
+}
+
+h2{
+    margin:5px 0;
+    color:#0b5d3b;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+}
+
+th,td{
+    border:1px solid #ccc;
+    padding:8px;
+    text-align:center;
+}
+
+.total{
+    margin-top:15px;
+    font-size:20px;
+    text-align:left;
+}
+
+.actions{
+    text-align:center;
+    margin-top:20px;
+}
+
+button{
+    padding:10px 15px;
+    margin:5px;
+    cursor:pointer;
+}
+
+@media print{
+    .actions{ display:none; }
+    body{ background:white; }
+}
+
+/* ===== Popup ===== */
+#editBox{
+    display:none;
+    position:fixed;
+    top:20%;
+    right:30%;
+    background:white;
+    padding:20px;
+    box-shadow:0 0 10px gray;
+    z-index:999;
+}
+#editBox input{
+    display:block;
+    margin:8px 0;
+    padding:6px;
+    width:250px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="invoice-box">
+
+    <!-- HEADER -->
+    <div class="header">
+
+        <div class="header-top">
+            <div class="logo-section">
+                <img src="logo.jpeg">
+            </div>
+
+            <div class="supplier-info">
+                <div><b>اسم المورد:</b> <span id="supplierName"></span></div>
+                <div><b>تليفون المورد:</b> <span id="supplierPhone"></span></div>
+            </div>
+        </div>
+
+        <h2 id="invoiceTitle"></h2>
+
+        <div class="store-info">
+            <div><b>السوبر ماركت:</b> <span id="storeName"></span></div>
+            <div><b>العنوان:</b> <span id="storeAddress"></span></div>
+            <div><b>تليفون:</b> <span id="storePhone"></span></div>
+        </div>
+
+    </div>
+
+    <!-- TABLE -->
+    <table>
+        <thead>
+        <tr>
+            <th>كود</th>
+            <th>اسم</th>
+            <th>سعر</th>
+            <th>كمية</th>
+            <th>الإجمالي</th>
+        </tr>
+        </thead>
+        <tbody id="items"></tbody>
+    </table>
+
+    <div class="total">
+        الإجمالي: <span id="total"></span>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="actions">
+
+        <input type="text" id="phone" placeholder="رقم واتساب" style="padding:8px">
+
+        <button onclick="window.print()">🖨 طباعة / PDF</button>
+        <button onclick="sendWhatsApp()">📲 إرسال واتساب</button>
+        <button onclick="editStore()">⚙️ تعديل بيانات السوبر ماركت</button>
+
+    </div>
+
+</div>
+
+<!-- ===== Popup Edit ===== -->
+<div id="editBox">
+
+    <h3>تعديل بيانات السوبر ماركت</h3>
+
+    <input id="newName" placeholder="اسم السوبر ماركت">
+    <input id="newAddress" placeholder="العنوان">
+    <input id="newPhone" placeholder="التليفون">
+
+    <button onclick="saveStore()">💾 حفظ</button>
+    <button onclick="closeEdit()">❌ إغلاق</button>
+
+</div>
+
+<script>
+
+/* =========================
+   البيانات
+========================= */
+
+let storeData = JSON.parse(localStorage.getItem("storeData")) || {
+    name: "سوبر ماركت مينا",
+    address: "شارع ....... - القاهرة",
+    phone: "01111111111"
+};
+
+let supplierData = JSON.parse(localStorage.getItem("supplierData")) || {
+    name: "مينا ميلاد",
+    phone: "01273819198"
+};
+
+/* =========================
+   عرض البيانات
+========================= */
+
+function loadHeader(){
+
+    document.getElementById("storeName").innerText = storeData.name;
+    document.getElementById("storeAddress").innerText = storeData.address;
+    document.getElementById("storePhone").innerText = storeData.phone;
+
+    document.getElementById("supplierName").innerText = supplierData.name;
+    document.getElementById("supplierPhone").innerText = supplierData.phone;
+
+    document.getElementById("invoiceTitle").innerText =
+        "فاتورة " + supplierData.name;
+}
+
+loadHeader();
+
+/* =========================
+   الفاتورة
+========================= */
+
+let data = JSON.parse(localStorage.getItem("invoiceData")) || [];
+
+let table = document.getElementById("items");
+let total = 0;
+
+data.forEach(item=>{
+    total += item.total;
+
+    table.innerHTML += `
+    <tr>
+        <td>${item.code}</td>
+        <td>${item.name}</td>
+        <td>${item.price}</td>
+        <td>${item.qty}</td>
+        <td>${item.total}</td>
+    </tr>`;
+});
+
+document.getElementById("total").innerText = total;
+
+/* =========================
+   واتساب
+========================= */
+
+function sendWhatsApp(){
+
+    let phone = document.getElementById("phone").value;
+
+    if(!phone){
+        alert("اكتبي رقم واتساب");
+        return;
+    }
+
+    let text = "🧾 فاتورة شراء:%0A";
+
+    data.forEach(i=>{
+        text += `- ${i.name} x${i.qty} = ${i.total}%0A`;
+    });
+
+    text += `%0A💰 الإجمالي: ${total}`;
+
+    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+}
+
+/* =========================
+   تعديل السوبر ماركت
+========================= */
+
+function editStore(){
+
+    document.getElementById("editBox").style.display = "block";
+
+    document.getElementById("newName").value = storeData.name;
+    document.getElementById("newAddress").value = storeData.address;
+    document.getElementById("newPhone").value = storeData.phone;
+}
+
+function closeEdit(){
+    document.getElementById("editBox").style.display = "none";
+}
+
+function saveStore(){
+
+    storeData = {
+        name: document.getElementById("newName").value,
+        address: document.getElementById("newAddress").value,
+        phone: document.getElementById("newPhone").value
+    };
+
+    localStorage.setItem("storeData", JSON.stringify(storeData));
+
+    loadHeader();
+    closeEdit();
+}
+
+</script>
+
+</body>
+</html>
