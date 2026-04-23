@@ -110,7 +110,7 @@ input, button {margin:5px; padding:8px;}
 <table class="table" id="cartTable">
 <thead>
 <tr>
-<th>كود</th><th>اسم</th><th>سعر</th><th>كمية</th>
+<th>عدد</th><th>اسم</th><th>سعر</th><th>كمية</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -191,8 +191,8 @@ async function loadProducts(){
         <td>${p.price*p.qty}</td>
         <td>
         <input type="number" id="take${id}">
-        <button onclick="addToCart('${id}',${p.price},'${p.name}',${p.qty})">نقل</button>
-        <button onclick="deleteProduct('${id}')">حذف</button>
+        <button onclick="addToCart('${id}',${p.price},'${p.name}',${p.qty})">تحميل</button>
+        <button onclick="deleteProduct('${id}')">تنزيل</button>
         </td>
         </tr>
         `;
